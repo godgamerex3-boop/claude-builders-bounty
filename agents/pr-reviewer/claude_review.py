@@ -30,6 +30,12 @@ PR_URL_PATTERN = re.compile(
 # High-Risk Patterns for Security and Robustness Analysis
 RISK_RULES = [
     {
+        "name": "Unresolved TODO or FIXME Marker",
+        "severity": "LOW",
+        "pattern": re.compile(r"\b(TODO|FIXME|HACK|XXX)\b", re.IGNORECASE),
+        "description": "Unresolved placeholder or technical debt marker introduced in additions.",
+    },
+    {
         "name": "Hardcoded Secret / Token",
         "pattern": re.compile(
             r"(ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|sk-[a-zA-Z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN (RSA|OPENSSH|PRIVATE) KEY-----)",
@@ -189,9 +195,19 @@ class GitHubReviewer:
             elif line.startswith("-") and not line.startswith("---"):
                 deleted_lines_count += 1
 
+        has_migrations = any("migration" in line.lower() for line in diff_text.splitlines() if line.startswith("+++ b/"))
+        has_dep_changes = any(f in diff_text for f in ["package.json", "requirements.txt", "Cargo.toml", "go.mod", "pom.xml"])
+        has_todos = any(r.rule_name == "Unresolved TODO or FIXME Marker" for r in risks)
+
         # Derive actionable suggestions
         if not has_tests:
             suggestions.append("Add automated unit or integration tests verifying the newly introduced code paths.")
+        if has_migrations:
+            suggestions.append("Verify database migration backwards-compatibility and execute rollback dry-run.")
+        if has_dep_changes:
+            suggestions.append("Audit newly updated dependencies for known security vulnerabilities and lockfile consistency.")
+        if has_todos:
+            suggestions.append("Address or track newly introduced TODO/FIXME comments in project issue tracker.")
         if not has_docs and added_lines_count > 80:
             suggestions.append("Update relevant developer documentation or `README.md` to document new flags and options.")
         if any(r.severity == "CRITICAL" for r in risks):
@@ -285,7 +301,7 @@ def main():
     parser.add_argument("--pr", type=str, help="Full GitHub PR URL (e.g. https://github.com/owner/repo/pull/123)")
     parser.add_argument("--diff", type=str, help="Path to local diff file")
     parser.add_argument("--output", type=str, help="Path to output markdown review file")
-    parser.add_argument("--post-comment", action="store_true", help="Post review comment directly to GitHub PR")
+    parser.add_argument("--post-comment", "--comment", action="store_true", dest="post_comment", help="Post review comment directly to GitHub PR")
     parser.add_argument("--token", type=str, help="GitHub Personal Access Token")
     args = parser.parse_args()
 
