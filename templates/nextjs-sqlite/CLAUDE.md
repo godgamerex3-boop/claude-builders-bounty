@@ -89,6 +89,8 @@ export const db = drizzle(sqlite, { schema });
 - Always use `integer("created_at", { mode: "timestamp" })` with `.default(sql`(strftime('%s', 'now'))`)` for epoch timestamps.
 - Explicitly define foreign key constraints with `onDelete: "cascade"` or `onDelete: "restrict"`.
 - Never use autoincrement integer IDs for public URLs; use CUID2, NanoID, or UUIDv7 strings to prevent ID enumeration attacks.
+- **Soft Deletes**: Define `deleted_at: integer("deleted_at", { mode: "timestamp" })` on critical customer entities with partial indexes (`where(isNull(table.deletedAt))`) for sub-millisecond query filtering.
+- **Compound Indexes**: Place compound indexes on high-frequency query filters (e.g. `index("user_tenant_idx").on(table.tenantId, table.createdAt)`).
 
 ### 3. Migration Commands Workflow
 - **Generate Migrations**: `pnpm drizzle-kit generate` (outputs deterministic, reviewable `.sql` files).
